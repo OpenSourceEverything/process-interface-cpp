@@ -30,6 +30,43 @@ bool LooksLikeJsonObject(const std::string& text) {
     return text[first] == '{' && text[last] == '}';
 }
 
+std::string CompactJson(const std::string& text) {
+    std::string output;
+    output.reserve(text.size());
+
+    bool in_string = false;
+    bool escaped = false;
+    std::size_t index;
+    for (index = 0; index < text.size(); ++index) {
+        const char c = text[index];
+        if (in_string) {
+            output.push_back(c);
+            if (escaped) {
+                escaped = false;
+            } else if (c == '\\') {
+                escaped = true;
+            } else if (c == '"') {
+                in_string = false;
+            }
+            continue;
+        }
+
+        if (c == '"') {
+            in_string = true;
+            output.push_back(c);
+            continue;
+        }
+
+        if (c == '\r' || c == '\n' || c == '\t' || c == ' ') {
+            continue;
+        }
+
+        output.push_back(c);
+    }
+
+    return output;
+}
+
 std::string BuildStatusCommand(const std::string& bridge_repo_root) {
     std::ostringstream command_stream;
     command_stream << "python \""
@@ -71,6 +108,7 @@ bool BridgeStatusAdapter::ReadStatusJson(const std::string& app_id, std::string&
         error_message = "bridge_status.py returned non-JSON output";
         return false;
     }
+    status_json = CompactJson(status_json);
 
     return true;
 }
