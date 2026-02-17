@@ -18,6 +18,13 @@ def _find_default_msvc_root() -> Path | None:
     return None
 
 
+def _find_default_sdk_root() -> Path | None:
+    candidate = Path(r"C:\Program Files\Microsoft Visual Studio\2022\Community\SDK\ScopeCppSDK\vc15\SDK")
+    if candidate.exists():
+        return candidate
+    return None
+
+
 def _resolve_cl_path(msvc_root: Path | None) -> Path | None:
     env_override = os.getenv("GPI_MSVC_CL", "").strip()
     if env_override:
@@ -63,6 +70,7 @@ def main() -> int:
     bin_dir.mkdir(parents=True, exist_ok=True)
 
     msvc_root = _find_default_msvc_root()
+    sdk_root = _find_default_sdk_root()
     cl_path = _resolve_cl_path(msvc_root)
     if cl_path is None:
         print("build failed: cl.exe not found. Install MSVC toolchain or set GPI_MSVC_CL.", file=sys.stderr)
@@ -70,12 +78,34 @@ def main() -> int:
 
     include_dir = msvc_root / "include" if msvc_root is not None else None
     lib_dir = msvc_root / "lib" if msvc_root is not None else None
+    sdk_include_root = sdk_root / "include" if sdk_root is not None else None
+    sdk_lib_dir = sdk_root / "lib" if sdk_root is not None else None
     if include_dir is None or not include_dir.exists():
         print("build failed: include dir not found for MSVC toolchain.", file=sys.stderr)
         return 2
     if lib_dir is None or not lib_dir.exists():
         print("build failed: lib dir not found for MSVC toolchain.", file=sys.stderr)
         return 2
+    if sdk_include_root is None or not sdk_include_root.exists():
+        print("build failed: SDK include dir not found for MSVC toolchain.", file=sys.stderr)
+        return 2
+    if sdk_lib_dir is None or not sdk_lib_dir.exists():
+        print("build failed: SDK lib dir not found for MSVC toolchain.", file=sys.stderr)
+        return 2
+
+    include_dirs = [
+        include_dir,
+        sdk_include_root / "ucrt",
+        sdk_include_root / "shared",
+        sdk_include_root / "um",
+    ]
+    include_args: list[str] = []
+    include_path: Path
+    for include_path in include_dirs:
+        if not include_path.exists():
+            print(f"build failed: include path missing: {include_path}", file=sys.stderr)
+            return 2
+        include_args.append(f"/I{include_path}")
 
     source_files = [
         str((repo_root / "bridge_host" / "main.cpp").resolve()),
@@ -89,11 +119,12 @@ def main() -> int:
         "/EHsc",
         "/std:c++17",
         "/W3",
-        f"/I{include_dir}",
+        *include_args,
         "/Fo" + str(obj_dir) + "\\",
         *source_files,
         "/link",
         f"/LIBPATH:{lib_dir}",
+        f"/LIBPATH:{sdk_lib_dir}",
         f"/OUT:{output_path}",
     ]
 
