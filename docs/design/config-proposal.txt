@@ -1,0 +1,146 @@
+
+Keep it very simple.
+
+Goal:
+- JSON is read once.
+- Code uses simple data objects.
+- Modules never read JSON.
+
+Steps:
+
+1) Define one simple struct in code
+Example:
+struct DbConfig
+{
+    std::string host;
+    int         port;
+    std::string user;
+    std::string password;
+};
+
+2) Write one loader function
+Example:
+DbConfig LoadDbConfig(const std::string& path)
+{
+    DbConfig cfg;
+
+    json j = read_json_file(path);   // only place that touches JSON
+
+    cfg.host     = j["host"];
+    cfg.port     = j["port"];
+    cfg.user     = j["user"];
+    cfg.password = j["password"];
+
+    return cfg;
+}
+
+3) Module uses only the struct
+Example:
+class Database
+{
+public:
+    Database(const DbConfig& cfg)
+    {
+        connect(cfg.host, cfg.port, cfg.user, cfg.password);
+    }
+};
+
+4) main wires it together
+Example:
+int main()
+{
+    DbConfig cfg = LoadDbConfig("config/db.json");
+
+    Database db(cfg);
+
+    run_app(db);
+
+    return 0;
+}
+
+Result:
+- JSON parsing exists in exactly one place.
+- Database class is decoupled from JSON and filesystem.
+- No duplication of logic, just one struct + one loader.
+
+
+config/
+	overrides/
+		db.mysql.json
+		sensor.i2c.json
+	app/
+		schema.json
+		active.profile.json
+		profiles/
+			default.json
+			sim.json
+			prod.json
+			
+	db/
+		default.json
+		active.profile.json
+		schema.json
+		mysql/
+			schema.json
+			active.profile.json
+			profiles/
+				default.json
+				live.json
+				sim.json
+	sensor
+		i2c/
+			active.profile.json
+			schema.json
+
+
+* active.profile.json files correspond to the module they exist in
+	- Only ONE profile is selected per module, by that module's
+	  active.profile.json.
+	- Overrides are optional and always last.
+	
+* Config loader validates against schema
+	Make it explicit in the loader:
+	- validate keys allowed
+	- validate required keys present
+	- validate types and ranges
+	- validate strings not empty when required
+
+* overrides are deterministic as such:
+	Exact order for module X:
+	A) Read X/schema.json (defines allowed keys, types, defaults).
+	B) Start cfg = defaults from schema.
+	C) Merge X/default.json into cfg.
+	D) Read X/active.profile.json -> name "p".
+	E) Merge X/profiles/p.json into cfg.
+	F) If config/overrides/X.*.json exists, merge it into cfg last.
+	G) If any key appears that is not in schema, fail.
+	H) If any required key missing after merge, fail.
+	I) If any type/range invalid, fail.
+	
+	Conflict rule:
+	- Later steps overwrite earlier steps.
+	- If two files in the same step set the same key, fail (unless you
+	  explicitly allow it).
+
+
+* runtime config changes:
+	Goal:
+	- Modules still never read JSON.
+	- Runtime edits are safe and atomic.
+
+	Design:
+	- One ConfigManager owns all structs.
+	- It loads all modules' configs using the rules in (2).
+	- It exposes status/config snapshots (immutable structs).
+
+	Runtime update:
+	- Edit files on disk.
+	- Trigger reload (signal, button, admin command, or periodic check).
+	- Reload builds a NEW full set of structs in memory.
+	- Validate everything.
+	- If success: swap pointer atomically to new snapshot.
+	- If fail: keep old snapshot, report error.
+
+	Thread safety:
+	- current snapshot stored as shared_ptr<const AllConfig>.
+	- Readers copy shared_ptr, then read fields with no locks.
