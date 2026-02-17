@@ -11,6 +11,10 @@ struct WireRequest {
     std::string app_id;
     std::string key;
     std::string value;
+    std::string action_name;
+    std::string args_json;
+    std::string job_id;
+    double timeout_seconds;
 };
 
 std::string JsonEscape(const std::string& value);

@@ -75,6 +75,7 @@ def _compile_target(
         "/link",
         f"/LIBPATH:{lib_dir}",
         f"/LIBPATH:{sdk_lib_dir}",
+        "Ws2_32.lib",
         f"/OUT:{output_path}",
     ]
     print("BUILD:", " ".join(command), flush=True)
@@ -82,6 +83,14 @@ def _compile_target(
     if rc != 0:
         print(f"build failed: {output_path.name}", file=sys.stderr)
     return rc
+
+
+def _sources_exist(source_files: list[str]) -> bool:
+    source_path: str
+    for source_path in source_files:
+        if not Path(source_path).exists():
+            return False
+    return True
 
 
 def main() -> int:
@@ -143,12 +152,28 @@ def main() -> int:
     bridge_sources = [
         str((repo_root / "bridge_host" / "main.cpp").resolve()),
         str((repo_root / "bridge_adapter" / "bridge_adapter.cpp").resolve()),
+        str((repo_root / "status" / "api.cpp").resolve()),
+        str((repo_root / "status" / "context.cpp").resolve()),
+        str((repo_root / "status" / "debug.cpp").resolve()),
+        str((repo_root / "status" / "engine.cpp").resolve()),
+        str((repo_root / "status" / "error_map.cpp").resolve()),
+        str((repo_root / "status" / "paths.cpp").resolve()),
+        str((repo_root / "status" / "spec_loader.cpp").resolve()),
+        str((repo_root / "status" / "writer.cpp").resolve()),
         str((repo_root / "wire_v0" / "wire_v0.cpp").resolve()),
     ]
 
     fixture_sources = [
         str((repo_root / "fixture_host" / "main.cpp").resolve()),
         str((repo_root / "fixture_adapter" / "fixture_adapter.cpp").resolve()),
+        str((repo_root / "status" / "api.cpp").resolve()),
+        str((repo_root / "status" / "context.cpp").resolve()),
+        str((repo_root / "status" / "debug.cpp").resolve()),
+        str((repo_root / "status" / "engine.cpp").resolve()),
+        str((repo_root / "status" / "error_map.cpp").resolve()),
+        str((repo_root / "status" / "paths.cpp").resolve()),
+        str((repo_root / "status" / "spec_loader.cpp").resolve()),
+        str((repo_root / "status" / "writer.cpp").resolve()),
         str((repo_root / "wire_v0" / "wire_v0.cpp").resolve()),
     ]
 
@@ -165,21 +190,25 @@ def main() -> int:
     if rc != 0:
         return rc
 
-    rc = _compile_target(
-        cl_path=cl_path,
-        repo_root=repo_root,
-        obj_dir=obj_dir,
-        include_args=include_args,
-        lib_dir=lib_dir,
-        sdk_lib_dir=sdk_lib_dir,
-        output_path=fixture_output_path,
-        source_files=fixture_sources,
-    )
-    if rc != 0:
-        return rc
+    if _sources_exist(fixture_sources):
+        rc = _compile_target(
+            cl_path=cl_path,
+            repo_root=repo_root,
+            obj_dir=obj_dir,
+            include_args=include_args,
+            lib_dir=lib_dir,
+            sdk_lib_dir=sdk_lib_dir,
+            output_path=fixture_output_path,
+            source_files=fixture_sources,
+        )
+        if rc != 0:
+            return rc
+    else:
+        print("build skip: gpi_fixture_host sources not present in this checkout")
 
     print(f"build ok: {bridge_output_path}")
-    print(f"build ok: {fixture_output_path}")
+    if fixture_output_path.exists():
+        print(f"build ok: {fixture_output_path}")
     return 0
 
 
