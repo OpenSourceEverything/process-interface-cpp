@@ -52,8 +52,40 @@ def _run_command(command: list[str], *, cwd: Path, extra_path: Path | None) -> i
     return int(process.returncode)
 
 
+def _compile_target(
+    *,
+    cl_path: Path,
+    repo_root: Path,
+    obj_dir: Path,
+    include_args: list[str],
+    lib_dir: Path,
+    sdk_lib_dir: Path,
+    output_path: Path,
+    source_files: list[str],
+) -> int:
+    command = [
+        str(cl_path),
+        "/nologo",
+        "/EHsc",
+        "/std:c++17",
+        "/W3",
+        *include_args,
+        "/Fo" + str(obj_dir) + "\\",
+        *source_files,
+        "/link",
+        f"/LIBPATH:{lib_dir}",
+        f"/LIBPATH:{sdk_lib_dir}",
+        f"/OUT:{output_path}",
+    ]
+    print("BUILD:", " ".join(command), flush=True)
+    rc = _run_command(command, cwd=repo_root, extra_path=cl_path.parent)
+    if rc != 0:
+        print(f"build failed: {output_path.name}", file=sys.stderr)
+    return rc
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build gpi_bridge_host.")
+    parser = argparse.ArgumentParser(description="Build gpi_bridge_host and gpi_fixture_host.")
     parser.add_argument("--clean", action="store_true")
     args = parser.parse_args()
 
@@ -61,7 +93,8 @@ def main() -> int:
     build_dir = repo_root / "build"
     obj_dir = build_dir / "obj"
     bin_dir = build_dir / "bin"
-    output_path = bin_dir / "gpi_bridge_host.exe"
+    bridge_output_path = bin_dir / "gpi_bridge_host.exe"
+    fixture_output_path = bin_dir / "gpi_fixture_host.exe"
 
     if args.clean and build_dir.exists():
         shutil.rmtree(build_dir)
@@ -107,34 +140,46 @@ def main() -> int:
             return 2
         include_args.append(f"/I{include_path}")
 
-    source_files = [
+    bridge_sources = [
         str((repo_root / "bridge_host" / "main.cpp").resolve()),
         str((repo_root / "bridge_adapter" / "bridge_adapter.cpp").resolve()),
         str((repo_root / "wire_v0" / "wire_v0.cpp").resolve()),
     ]
 
-    command = [
-        str(cl_path),
-        "/nologo",
-        "/EHsc",
-        "/std:c++17",
-        "/W3",
-        *include_args,
-        "/Fo" + str(obj_dir) + "\\",
-        *source_files,
-        "/link",
-        f"/LIBPATH:{lib_dir}",
-        f"/LIBPATH:{sdk_lib_dir}",
-        f"/OUT:{output_path}",
+    fixture_sources = [
+        str((repo_root / "fixture_host" / "main.cpp").resolve()),
+        str((repo_root / "fixture_adapter" / "fixture_adapter.cpp").resolve()),
+        str((repo_root / "wire_v0" / "wire_v0.cpp").resolve()),
     ]
 
-    print("BUILD:", " ".join(command), flush=True)
-    rc = _run_command(command, cwd=repo_root, extra_path=cl_path.parent)
+    rc = _compile_target(
+        cl_path=cl_path,
+        repo_root=repo_root,
+        obj_dir=obj_dir,
+        include_args=include_args,
+        lib_dir=lib_dir,
+        sdk_lib_dir=sdk_lib_dir,
+        output_path=bridge_output_path,
+        source_files=bridge_sources,
+    )
     if rc != 0:
-        print("build failed", file=sys.stderr)
         return rc
 
-    print(f"build ok: {output_path}")
+    rc = _compile_target(
+        cl_path=cl_path,
+        repo_root=repo_root,
+        obj_dir=obj_dir,
+        include_args=include_args,
+        lib_dir=lib_dir,
+        sdk_lib_dir=sdk_lib_dir,
+        output_path=fixture_output_path,
+        source_files=fixture_sources,
+    )
+    if rc != 0:
+        return rc
+
+    print(f"build ok: {bridge_output_path}")
+    print(f"build ok: {fixture_output_path}")
     return 0
 
 
