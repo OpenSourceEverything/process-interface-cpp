@@ -29,6 +29,16 @@ FORBIDDEN_ROUTER_FILES = (
     "provider_api/control_router.cpp",
 )
 
+FORBIDDEN_LEGACY_PROVIDER_SURFACES = (
+    "provider_api/control_script_runner.h",
+    "provider_api/control_script_runner.cpp",
+    "provider_api/provider_api.h",
+    "bridge_adapter/bridge_adapter.h",
+    "bridge_adapter/bridge_adapter.cpp",
+    "fixture_adapter/fixture_adapter.h",
+    "fixture_adapter/fixture_adapter.cpp",
+)
+
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
@@ -60,6 +70,11 @@ def main() -> int:
         path = repo_root / rel
         if path.exists():
             errors.append(f"forbidden legacy router file exists: {path}")
+
+    for rel in FORBIDDEN_LEGACY_PROVIDER_SURFACES:
+        path = repo_root / rel
+        if path.exists():
+            errors.append(f"forbidden legacy provider surface exists: {path}")
 
     for rel, token in FORBIDDEN_HOST_TOKENS:
         path = repo_root / rel
