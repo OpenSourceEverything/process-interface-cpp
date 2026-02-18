@@ -21,6 +21,7 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/bridge_host/main.cpp" AND EXISTS "${CMAK
     gpi_bridge_host
     bridge_host/main.cpp
     bridge_adapter/bridge_adapter.cpp
+    provider_api/control_script_runner.cpp
     ${GPI_STATUS_SOURCES}
     wire_v0/wire_v0.cpp
   )
@@ -32,6 +33,7 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/fixture_host/main.cpp" AND EXISTS "${CMA
     gpi_fixture_host
     fixture_host/main.cpp
     fixture_adapter/fixture_adapter.cpp
+    provider_api/control_script_runner.cpp
     ${GPI_STATUS_SOURCES}
     wire_v0/wire_v0.cpp
   )

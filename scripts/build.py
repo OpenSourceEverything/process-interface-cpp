@@ -152,6 +152,7 @@ def main() -> int:
     bridge_sources = [
         str((repo_root / "bridge_host" / "main.cpp").resolve()),
         str((repo_root / "bridge_adapter" / "bridge_adapter.cpp").resolve()),
+        str((repo_root / "provider_api" / "control_script_runner.cpp").resolve()),
         str((repo_root / "status" / "api.cpp").resolve()),
         str((repo_root / "status" / "context.cpp").resolve()),
         str((repo_root / "status" / "debug.cpp").resolve()),
@@ -166,6 +167,7 @@ def main() -> int:
     fixture_sources = [
         str((repo_root / "fixture_host" / "main.cpp").resolve()),
         str((repo_root / "fixture_adapter" / "fixture_adapter.cpp").resolve()),
+        str((repo_root / "provider_api" / "control_script_runner.cpp").resolve()),
         str((repo_root / "status" / "api.cpp").resolve()),
         str((repo_root / "status" / "context.cpp").resolve()),
         str((repo_root / "status" / "debug.cpp").resolve()),

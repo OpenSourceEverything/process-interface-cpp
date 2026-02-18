@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "../provider_api/control_script_runner.h"
 #include "../provider_api/provider_api.h"
 
 namespace gpi {
@@ -29,6 +30,7 @@ public:
 
 private:
     std::string fixture_repo_root_;
+    ControlScriptRunner control_runner_;
 };
 
 }  // namespace gpi
