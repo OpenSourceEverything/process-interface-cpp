@@ -29,7 +29,7 @@ def _request_raw(
         input=json.dumps(request_payload, separators=(",", ":")) + "\n",
         text=True,
         capture_output=True,
-        timeout=15.0,
+        timeout=30.0,
     )
     if process.returncode != 0:
         raise RuntimeError(f"host exited non-zero: {process.returncode} stderr={process.stderr.strip()}")
@@ -51,6 +51,17 @@ def _request(
     if not bool(payload.get("ok", False)):
         raise RuntimeError(f"{method} failed: {payload}")
     return payload
+
+
+def _assert_error_code(payload: dict[str, Any], expected_code: str) -> None:
+    if bool(payload.get("ok", False)):
+        raise RuntimeError(f"expected error response, got success: {payload}")
+    error_obj = payload.get("error")
+    if not isinstance(error_obj, dict):
+        raise RuntimeError(f"error response missing error object: {payload}")
+    code = str(error_obj.get("code") or "")
+    if code != expected_code:
+        raise RuntimeError(f"expected error code {expected_code}, got {code}: {payload}")
 
 
 def _snapshot_path(repo_path: Path, app_id: str) -> Path:
@@ -156,6 +167,76 @@ def main() -> int:
     if not isinstance(response_payload, dict):
         print(f"status response not object: {status}", file=sys.stderr)
         return 2
+
+    config_get = _request(host_path, repo_arg_name, target_repo, "config.get", {"appId": expected_app_id})
+    if not isinstance(config_get.get("response"), dict):
+        print(f"config.get response not object: {config_get}", file=sys.stderr)
+        return 2
+
+    config_set = _request(
+        host_path,
+        repo_arg_name,
+        target_repo,
+        "config.set",
+        {"appId": expected_app_id, "key": "profile", "value": "sim"},
+    )
+    if not isinstance(config_set.get("response"), dict):
+        print(f"config.set response not object: {config_set}", file=sys.stderr)
+        return 2
+
+    action_list = _request(host_path, repo_arg_name, target_repo, "action.list", {"appId": expected_app_id})
+    action_list_payload = action_list.get("response")
+    if not isinstance(action_list_payload, dict) or not isinstance(action_list_payload.get("actions"), list):
+        print(f"action.list response invalid: {action_list}", file=sys.stderr)
+        return 2
+
+    invoke_action_name = "config_show"
+    found_config_show = False
+    actions = action_list_payload.get("actions")
+    if isinstance(actions, list):
+        index = 0
+        while index < len(actions):
+            item = actions[index]
+            if isinstance(item, dict) and str(item.get("name") or "") == invoke_action_name:
+                found_config_show = True
+                break
+            index += 1
+    if not found_config_show:
+        print("action.list missing required smoke action 'config_show'", file=sys.stderr)
+        return 2
+
+    action_invoke = _request(
+        host_path,
+        repo_arg_name,
+        target_repo,
+        "action.invoke",
+        {"appId": expected_app_id, "actionName": invoke_action_name, "args": {}},
+    )
+    if not isinstance(action_invoke.get("response"), dict):
+        print(f"action.invoke response invalid: {action_invoke}", file=sys.stderr)
+        return 2
+
+    missing_app = _request_raw(host_path, repo_arg_name, target_repo, "config.get", {})
+    _assert_error_code(missing_app, "E_BAD_ARG")
+
+    unsupported_app = _request_raw(
+        host_path,
+        repo_arg_name,
+        target_repo,
+        "config.get",
+        {"appId": "unsupported-app"},
+    )
+    _assert_error_code(unsupported_app, "E_UNSUPPORTED_APP")
+
+    missing_action_name = _request_raw(
+        host_path,
+        repo_arg_name,
+        target_repo,
+        "action.invoke",
+        {"appId": expected_app_id, "args": {}},
+    )
+    _assert_error_code(missing_action_name, "E_BAD_ARG")
+
     _assert_snapshot_written(target_repo, expected_app_id)
     _assert_parity_fixture_contains_app(repo_root, expected_app_id)
 

@@ -11,9 +11,10 @@ FORBIDDEN_FILES = (
     "status/fixture_status_collector.cpp",
 )
 
-REQUIRED_HOST_TOKENS = (
-    ("bridge_host/main.cpp", "CollectAndPublishStatus"),
-    ("fixture_host/main.cpp", "CollectAndPublishStatus"),
+REQUIRED_RUNTIME_TOKENS = (
+    ("process_interface/host/dispatcher.cpp", "CollectAndPublishStatus"),
+    ("bridge_host/main.cpp", "HandleRequest"),
+    ("fixture_host/main.cpp", "HandleRequest"),
 )
 
 FORBIDDEN_HOST_TOKENS = (
@@ -21,6 +22,11 @@ FORBIDDEN_HOST_TOKENS = (
     ("fixture_host/main.cpp", "ReadStatusSnapshotPayload"),
     ("bridge_host/main.cpp", "status_snapshot_reader"),
     ("fixture_host/main.cpp", "status_snapshot_reader"),
+)
+
+FORBIDDEN_ROUTER_FILES = (
+    "provider_api/control_router.h",
+    "provider_api/control_router.cpp",
 )
 
 
@@ -41,7 +47,7 @@ def main() -> int:
         if path.exists():
             errors.append(f"forbidden app-specific collector file exists: {path}")
 
-    for rel, token in REQUIRED_HOST_TOKENS:
+    for rel, token in REQUIRED_RUNTIME_TOKENS:
         path = repo_root / rel
         if not path.exists():
             errors.append(f"missing required file: {path}")
@@ -49,6 +55,11 @@ def main() -> int:
         text = _read(path)
         if token not in text:
             errors.append(f"{path}: missing required token '{token}'")
+
+    for rel in FORBIDDEN_ROUTER_FILES:
+        path = repo_root / rel
+        if path.exists():
+            errors.append(f"forbidden legacy router file exists: {path}")
 
     for rel, token in FORBIDDEN_HOST_TOKENS:
         path = repo_root / rel
