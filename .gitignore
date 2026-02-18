@@ -1,3 +1,9 @@
-build/
+artifacts/build/
+artifacts/logs/
+runtime/logs/
+runtime/sessions/
+runtime/state/
+__pycache__/
+*.pyc
 *.obj
 *.pdb

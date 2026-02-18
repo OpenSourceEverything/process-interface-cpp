@@ -8,9 +8,9 @@
 ## Current Operations
 
 ### Bridge (`C:/repos/test-fixture-data-bridge`)
-1. Provider: `scripts/interface_provider.py`
-2. IPC server: `scripts/status_ipc_server.py`
-3. Filesystem sync: `scripts/interface_fs_sync.py`
+1. Provider: `ops/scripts/interface_provider.py`
+2. IPC server: `ops/scripts/status_ipc_server.py`
+3. Filesystem sync: `ops/scripts/interface_fs_sync.py`
 4. Current IPC ops:
 - `ping`
 - `status`
@@ -20,9 +20,9 @@
 - `config.set`
 
 ### Fixture (`Z:/40318-SOFT`)
-1. Provider: `scripts/interface_provider.py`
-2. IPC server: `scripts/status_ipc_server.py`
-3. Filesystem sync: `scripts/interface_fs_sync.py`
+1. Provider: `ops/scripts/interface_provider.py`
+2. IPC server: `ops/scripts/status_ipc_server.py`
+3. Filesystem sync: `ops/scripts/interface_fs_sync.py`
 4. Current IPC ops:
 - `ping`
 - `status`
@@ -83,10 +83,10 @@
 - `message`
 
 ## Filesystem Snapshot Compatibility
-1. Keep current snapshot folders:
-- `interface/status/<app>/...`
-- `interface/config/<app>/...`
-- `interface/actions/<app>/...`
+1. Keep snapshot folders under artifacts:
+- `artifacts/snapshots/interface/status/<app>/...`
+- `artifacts/snapshots/interface/config/<app>/...`
+- `artifacts/snapshots/interface/actions/<app>/...`
 2. FS sync remains an adapter over the same provider methods.
 3. Do not change GUI target layout during contract migration.
 
@@ -104,4 +104,3 @@
 1. Both repos support V0 method names.
 2. Legacy op names can be served as compatibility aliases.
 3. Parity checks remain green across `bridge`, `40318`, `plc-simulator`, `ble-simulator`.
-

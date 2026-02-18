@@ -1,0 +1,17 @@
+{
+  "allowedApps": [
+    "40318",
+    "plc-simulator",
+    "ble-simulator"
+  ],
+  "ipc": {
+    "backend": "zmq",
+    "endpoint": "tcp://127.0.0.1:57102"
+  },
+  "paths": {
+    "statusSpec": "{repoRoot}/config/process-interface/status/{appId}.status.json",
+    "statusSnapshot": "{repoRoot}/runtime/logs/process-interface/status-source/{appId}.json",
+    "actionCatalog": "{repoRoot}/config/actions/{appId}.actions.json",
+    "actionJob": "{repoRoot}/runtime/state/process-interface/action-jobs/{appId}/{jobId}.json"
+  }
+}
