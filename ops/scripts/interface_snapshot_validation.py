@@ -13,10 +13,7 @@ from pathlib import Path
 from typing import Any
 
 
-def detect_apps(repo_root: Path) -> list[str]:
-    if (repo_root / "40318-Service.sln").exists():
-        return ["40318", "plc-simulator", "ble-simulator"]
-    return ["bridge"]
+SUPPORTED_CONTRACT_VERSION = "v0"
 
 
 def parse_payload(text: str) -> dict[str, Any]:
@@ -222,11 +219,11 @@ def collect_payloads(
     return status_payloads, config_payloads, action_payloads
 
 
-def parse_apps(repo_root: Path, apps_arg: str) -> list[str]:
+def parse_apps(apps_arg: str) -> list[str]:
     values = [part.strip() for part in str(apps_arg or "").split(",") if part.strip()]
-    if values:
-        return values
-    return detect_apps(repo_root)
+    if not values:
+        raise RuntimeError("apps must be explicit: pass --apps app1,app2")
+    return values
 
 
 def main() -> int:
@@ -236,22 +233,29 @@ def main() -> int:
     parser.add_argument("--output-root", default="runtime/logs/process-interface")
     parser.add_argument(
         "--status-source-root",
-        default="",
-        help="Directory containing host-written status-source snapshots. Default: <output-root>/status-source.",
+        required=True,
+        help="Directory containing host-written status-source snapshots.",
     )
     parser.add_argument("--timeout-seconds", type=float, default=20.0)
-    parser.add_argument("--apps", default="", help="Comma-separated app ids. Default: auto-detect from repo shape.")
+    parser.add_argument("--apps", required=True, help="Comma-separated app ids.")
+    parser.add_argument("--contract-version", required=True, help="Pinned contract version identifier.")
     args = parser.parse_args()
 
     repo_root = Path(args.repo).resolve()
     output_root = Path(args.output_root)
     if not output_root.is_absolute():
         output_root = (repo_root / output_root).resolve()
-    status_source_root = Path(str(args.status_source_root or "").strip() or str(output_root / "status-source"))
+    status_source_root = Path(str(args.status_source_root or "").strip())
     if not status_source_root.is_absolute():
         status_source_root = (repo_root / status_source_root).resolve()
 
-    apps = parse_apps(repo_root, args.apps)
+    contract_version = str(args.contract_version or "").strip()
+    if contract_version != SUPPORTED_CONTRACT_VERSION:
+        raise RuntimeError(
+            f"unsupported contract version {contract_version!r}; expected {SUPPORTED_CONTRACT_VERSION!r}"
+        )
+
+    apps = parse_apps(args.apps)
     if output_root.exists():
         shutil.rmtree(output_root, ignore_errors=True)
     output_root.mkdir(parents=True, exist_ok=True)
@@ -277,4 +281,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
