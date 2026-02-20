@@ -319,9 +319,6 @@ bool ExecuteCatalogAction(
         result.ok = false;
         result.error_code = "action_failed";
         result.error_message = "action failed";
-        if (result.stderr_text.empty()) {
-            result.stderr_text = result.stdout_text;
-        }
     }
 
     result_out = result;

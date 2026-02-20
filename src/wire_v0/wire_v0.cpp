@@ -108,7 +108,8 @@ bool ParseRequestLine(const std::string& request_line, WireRequest& request, std
     return true;
 }
 
-std::string BuildOkResponse(const std::string& request_id, const std::string& response_json_object) {
+std::string BuildOkResponse(const std::string& request_id, const std::string& response_json_object) 
+{
     nlohmann::json payload = ParseObjectOrDefault(response_json_object, nlohmann::json::object());
 
     nlohmann::json response;
@@ -120,11 +121,11 @@ std::string BuildOkResponse(const std::string& request_id, const std::string& re
     return response.dump();
 }
 
-std::string BuildErrorResponse(
-    const std::string& request_id,
-    const std::string& error_code,
-    const std::string& error_message,
-    const std::string& error_details_json_object) {
+std::string BuildErrorResponse(const std::string& request_id,
+                               const std::string& error_code,
+                               const std::string& error_message,
+                               const std::string& error_details_json_object) 
+{
     nlohmann::json details = ParseObjectOrDefault(error_details_json_object, nlohmann::json::object());
 
     nlohmann::json response;

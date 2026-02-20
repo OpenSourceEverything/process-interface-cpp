@@ -1,5 +1,10 @@
 # Design V1 Notes
 
+## Sync 1 Freeze
+1. Freeze date: 2026-02-18.
+2. Canonical contract: `docs/design/contract-v0.md`.
+3. Canonical runtime host profile examples: `docs/design/host-profiles-v0.md`.
+
 ## Canonical Contract
 1. Primary contract document:
 - `docs/design/contract-v0.md`
@@ -20,8 +25,8 @@ a) process layout
 
 b) app modification
   1. add a tiny "rpc adapter" module
-     - reads json lines from stdin
-     - writes json lines to stdout
+     - consumes single-line json request messages from the selected transport binding
+     - emits single-line json response/event messages to the selected transport binding
      - calls your internal functions
   2. expose 3 required rpc methods
      - schema.get

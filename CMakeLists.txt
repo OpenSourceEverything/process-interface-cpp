@@ -123,3 +123,5 @@ target_include_directories(
 )
 target_compile_definitions(gpi_client PRIVATE IPC_BACKEND_ZMQ=1)
 target_link_libraries(gpi_client PRIVATE ${GPI_ZMQ_TARGET})
+
+add_subdirectory(src/examples)

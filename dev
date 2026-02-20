@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+import argparse
+import os
+import subprocess
+import sys
+
+DIR_ROOT              = os.path.dirname(os.path.abspath(__file__))
+DIR_BUILD_DEFAULT     = os.path.join(DIR_ROOT, "build")
+CMAKE_EXE             = "cmake"
+RUN_CLANG_TIDY_EXE    = "run-clang-tidy"
+CLANG_FORMAT_EXE      = "clang-format"
+BUILD_SCRIPT          = os.path.join(DIR_ROOT, "ops", "scripts", "build.py")
+
+def run_cmd(cmd, cwd):
+    ret = 1
+    try:
+        p = subprocess.run(cmd, cwd=cwd, check=False)
+        ret = int(p.returncode)
+    except Exception:
+        ret = 1
+    return ret
+
+def cmd_configure(build_dir):
+    ret = 1
+    os.makedirs(build_dir, exist_ok=True)
+    cmd = [
+        CMAKE_EXE,
+        "-S", DIR_ROOT,
+        "-B", build_dir,
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+    ]
+    ret = run_cmd(cmd, DIR_ROOT)
+    return ret
+
+def cmd_lint(build_dir):
+    ret = 1
+    ret_cfg = cmd_configure(build_dir)
+    if ret_cfg != 0:
+        ret = ret_cfg
+    else:
+        cmd = [
+            RUN_CLANG_TIDY_EXE,
+            "-p", build_dir,
+        ]
+        ret = run_cmd(cmd, DIR_ROOT)
+    return ret
+
+def cmd_format(paths):
+    ret = 1
+    cmd = [CLANG_FORMAT_EXE, "-i"] + paths
+    ret = run_cmd(cmd, DIR_ROOT)
+    return ret
+
+def cmd_build(build_args):
+    ret = 1
+    cmd = [sys.executable, BUILD_SCRIPT] + build_args
+    ret = run_cmd(cmd, DIR_ROOT)
+    return ret
+
+def main():
+    ret = 1
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "task",
+        choices=["build", "configure", "lint", "format"],
+    )
+    ap.add_argument(
+        "--build",
+        default=DIR_BUILD_DEFAULT,
+    )
+    ap.add_argument(
+        "paths",
+        nargs="*",
+    )
+    a, unknown = ap.parse_known_args()
+
+    if a.task == "build":
+        build_args = list(a.paths) + list(unknown)
+        ret = cmd_build(build_args)
+    elif len(unknown) > 0:
+        ret = 2
+        sys.stderr.write("unsupported args: %s\n" % " ".join(unknown))
+    elif a.task == "configure":
+        ret = cmd_configure(a.build)
+    elif a.task == "lint":
+        ret = cmd_lint(a.build)
+    elif a.task == "format":
+        if len(a.paths) == 0:
+            ret = 2
+            sys.stderr.write("format needs paths, example: ./dev format a.c\n")
+        else:
+            ret = cmd_format(a.paths)
+    else:
+        ret = 3
+
+    return ret
+
+if __name__ == "__main__":
+    sys.exit(main())

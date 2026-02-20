@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build gpi_host and gpi_client using CMake."""
+"""Build process-interface binaries using CMake."""
 
 from __future__ import annotations
 
@@ -74,11 +74,23 @@ def _find_binary(build_dir: Path, name: str) -> Path | None:
     return None
 
 
+def _stage_binary(build_dir: Path, bin_dir: Path, binary_name: str) -> Path | None:
+    source = _find_binary(build_dir, binary_name)
+    if source is None or not source.exists():
+        return None
+
+    destination = bin_dir / binary_name
+    if source.resolve() != destination.resolve():
+        shutil.copy2(source, destination)
+    return destination
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build gpi_host and gpi_client.")
+    parser = argparse.ArgumentParser(description="Build process-interface binaries.")
     parser.add_argument("--clean", action="store_true")
     parser.add_argument("--config", default="Release")
     args = parser.parse_args()
+    build_config = args.config
 
     repo_root = resolve_repo_root(Path(__file__))
     libzmq_cmake = repo_root / "external" / "libzmq" / "CMakeLists.txt"
@@ -126,7 +138,7 @@ def main() -> int:
         f"-DCMAKE_MAKE_PROGRAM={ninja_path.as_posix()}",
         f"-DCMAKE_C_COMPILER={gcc_path.as_posix()}",
         f"-DCMAKE_CXX_COMPILER={gxx_path.as_posix()}",
-        f"-DCMAKE_BUILD_TYPE={args.config}",
+        f"-DCMAKE_BUILD_TYPE={build_config}",
     ]
 
     rc = _run(
@@ -137,16 +149,31 @@ def main() -> int:
     if rc != 0:
         return rc
 
+    host_name = "gpi_host.exe" if sys.platform.startswith("win") else "gpi_host"
+    client_name = "gpi_client.exe" if sys.platform.startswith("win") else "gpi_client"
+    example_server_name = (
+        "gpi_example_talk_server.exe" if sys.platform.startswith("win") else "gpi_example_talk_server"
+    )
+    example_client_name = (
+        "gpi_example_talk_client.exe" if sys.platform.startswith("win") else "gpi_example_talk_client"
+    )
+
+    targets = [
+        "gpi_host",
+        "gpi_client",
+        "gpi_example_talk_server",
+        "gpi_example_talk_client",
+    ]
+
     rc = _run(
         [
             str(cmake_path),
             "--build",
             str(build_dir),
             "--config",
-            args.config,
+            build_config,
             "--target",
-            "gpi_host",
-            "gpi_client",
+            *targets,
         ],
         cwd=repo_root,
         extra_path=extra_path,
@@ -154,22 +181,13 @@ def main() -> int:
     if rc != 0:
         return rc
 
-    host_name = "gpi_host.exe" if sys.platform.startswith("win") else "gpi_host"
-    client_name = "gpi_client.exe" if sys.platform.startswith("win") else "gpi_client"
-
-    host_src = _find_binary(build_dir, host_name)
-    client_src = _find_binary(build_dir, client_name)
-    if host_src is None or not host_src.exists():
-        print(f"build failed: missing binary {host_name}", file=sys.stderr)
-        return 2
-    if client_src is None or not client_src.exists():
-        print(f"build failed: missing binary {client_name}", file=sys.stderr)
-        return 2
-
-    host_dst = bin_dir / host_name
-    client_dst = bin_dir / client_name
-    shutil.copy2(host_src, host_dst)
-    shutil.copy2(client_src, client_dst)
+    staged = {}
+    for binary_name in [host_name, client_name, example_server_name, example_client_name]:
+        binary_path = _stage_binary(build_dir, bin_dir, binary_name)
+        if binary_path is None:
+            print(f"build failed: missing binary {binary_name}", file=sys.stderr)
+            return 2
+        staged[binary_name] = binary_path
 
     runtime_dlls = ["libgcc_s_seh-1.dll", "libwinpthread-1.dll", "libstdc++-6.dll"]
     for dll_name in runtime_dlls:
@@ -177,8 +195,9 @@ def main() -> int:
         if source_dll.exists():
             shutil.copy2(source_dll, bin_dir / dll_name)
 
-    print(f"build ok: {host_dst}")
-    print(f"build ok: {client_dst}")
+    for binary_name in [host_name, client_name, example_server_name, example_client_name]:
+        print(f"build ok: {staged[binary_name]}")
+    print(f"build config: {build_config}")
     return 0
 
 

@@ -95,6 +95,13 @@ class HostContractTests(unittest.TestCase):
             "print(json.dumps({'echo':'ok'}))\n",
             encoding="utf-8",
         )
+        (repo_path / "run_fail_exit7.py").write_text(
+            "import sys\n"
+            "print('stdout-line')\n"
+            "sys.stderr.write('stderr-line\\n')\n"
+            "sys.exit(7)\n",
+            encoding="utf-8",
+        )
 
         status_spec = {
             "appId": app_id,
@@ -128,6 +135,12 @@ class HostContractTests(unittest.TestCase):
                     "name": "run_echo",
                     "label": "Run Echo",
                     "cmd": [sys.executable, "run_echo.py"],
+                    "args": [],
+                },
+                {
+                    "name": "run_fail_exit7",
+                    "label": "Run Fail Exit 7",
+                    "cmd": [sys.executable, "run_fail_exit7.py"],
                     "args": [],
                 },
             ]
@@ -260,6 +273,40 @@ class HostContractTests(unittest.TestCase):
 
                 job_file = repo_path / "runtime" / "custom-jobs" / app_id / f"{job_id}.json"
                 self.assertTrue(job_file.exists(), msg=f"missing action job path: {job_file}")
+            finally:
+                self._stop_host(host)
+
+    def test_action_job_nonzero_exit_has_combined_stdout_and_empty_stderr(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo_path = Path(tmp_dir)
+            app_id = "bridge"
+            self._write_fixture_repo(repo_path, app_id)
+            profile_path = repo_path / "host.profile.json"
+            self._write_profile(profile_path, app_id)
+
+            endpoint = _pick_endpoint()
+            host = subprocess.Popen(
+                [str(self.host_path), "--repo", str(repo_path), "--host-config", str(profile_path), "--ipc-endpoint", endpoint],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            try:
+                self._wait_ready(endpoint)
+
+                invoke_payload = self._request(endpoint, "action.invoke", {"appId": app_id, "actionName": "run_fail_exit7", "args": {}})
+                job_id = str(invoke_payload.get("jobId") or "")
+                self.assertTrue(job_id)
+
+                job_payload = self._request(endpoint, "action.job.get", {"appId": app_id, "jobId": job_id})
+                self.assertEqual(job_payload.get("state"), "failed")
+
+                stdout_text = str(job_payload.get("stdout") or "")
+                stderr_text = str(job_payload.get("stderr") or "")
+
+                self.assertIn("stdout-line", stdout_text)
+                self.assertIn("stderr-line", stdout_text)
+                self.assertEqual("", stderr_text)
             finally:
                 self._stop_host(host)
 

@@ -1,5 +1,10 @@
 # Process Interface Contract V0
 
+## Sync 1 Freeze
+1. Freeze date: 2026-02-18.
+2. This document is the contract baseline for provider migration lanes at Sync 1.
+3. Runtime host profile examples are frozen in `docs/design/host-profiles-v0.md`.
+
 ## Scope
 1. This document defines V0 of the shared process interface contract.
 2. It is transport-neutral.
@@ -202,6 +207,10 @@
   "acceptedAt": "2026-02-17T16:20:00Z"
 }
 ```
+5. Detached action semantics (when action catalog entry has `detached: true`):
+- launch is fire-and-forget
+- no later pid/exit/stdout/stderr updates are expected for that run
+- `action.job.get` may complete immediately with launch-level status only
 
 ### `action.job.get`
 1. Purpose: read async action status.
@@ -232,6 +241,9 @@
 - `failed`
 - `timeout`
 - `canceled`
+5. Output stream semantics are backend-dependent:
+- some backends expose combined process output only (`stdout` contains stdout+stderr)
+- `stderr` may be empty when separate stderr capture is not supported
 
 ### `events.subscribe` (Optional)
 1. Purpose: subscribe for push events where transport supports long-lived channels.
@@ -340,4 +352,3 @@
   "roleAppId": "ble-simulator"
 }
 ```
-
