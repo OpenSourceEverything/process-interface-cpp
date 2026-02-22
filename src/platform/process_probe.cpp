@@ -3,9 +3,18 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <tlhelp32.h>
+#endif
 
 #include "../common/file_io.h"
 #include "../common/fs_compat.h"
@@ -72,6 +81,59 @@ bool RunCommandCapture(const std::string& command, std::string& output_text) {
     return rc == 0;
 }
 
+#ifdef _WIN32
+std::string WideToUtf8(const wchar_t* text) {
+    if (text == NULL || text[0] == L'\0') {
+        return std::string();
+    }
+
+    const int required = WideCharToMultiByte(CP_UTF8, 0, text, -1, NULL, 0, NULL, NULL);
+    if (required <= 1) {
+        return std::string();
+    }
+
+    std::string buffer(static_cast<std::size_t>(required), '\0');
+    const int written = WideCharToMultiByte(CP_UTF8, 0, text, -1, &buffer[0], required, NULL, NULL);
+    if (written <= 1) {
+        return std::string();
+    }
+    buffer.resize(static_cast<std::size_t>(written - 1));
+    return buffer;
+}
+
+bool ProbeFromToolhelp(const std::string& process_name, std::vector<int>& pids_out) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    const std::string target = ToLowerCopy(process_name);
+    PROCESSENTRY32W entry;
+    entry.dwSize = sizeof(entry);
+    if (!Process32FirstW(snapshot, &entry)) {
+        CloseHandle(snapshot);
+        return false;
+    }
+
+    do {
+        const std::string image_name = ToLowerCopy(WideToUtf8(entry.szExeFile));
+        if (image_name != target) {
+            entry.dwSize = sizeof(entry);
+            continue;
+        }
+
+        const DWORD pid = entry.th32ProcessID;
+        if (pid > 0 && pid <= static_cast<DWORD>(std::numeric_limits<int>::max())) {
+            pids_out.push_back(static_cast<int>(pid));
+        }
+        entry.dwSize = sizeof(entry);
+    } while (Process32NextW(snapshot, &entry));
+
+    CloseHandle(snapshot);
+    return true;
+}
+#endif
+
 void ProbeFromPgrep(const std::string& process_name, std::vector<int>& pids_out) {
     std::string output;
     if (!RunCommandCapture("pgrep -i -x " + QuoteForShell(process_name), output)) {
@@ -137,13 +199,18 @@ ProcessQueryResult QueryProcessByName(const std::string& process_name) {
     }
 
     std::vector<int> pids;
-    ProbeFromPgrep(process_name, pids);
+#ifdef _WIN32
+    ProbeFromToolhelp(process_name, pids);
     if (pids.empty()) {
         ProbeFromTaskList(process_name, pids);
     }
+#else
+    ProbeFromPgrep(process_name, pids);
+#endif
 
     if (!pids.empty()) {
         std::sort(pids.begin(), pids.end());
+        pids.erase(std::unique(pids.begin(), pids.end()), pids.end());
         result.running = true;
         result.pid = pids[0];
         result.pids = pids;

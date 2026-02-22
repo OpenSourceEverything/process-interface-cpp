@@ -32,6 +32,11 @@ std::string CompactObjectJsonOrDefault(const std::string& text) {
     return std::string("{}");
 }
 
+bool IsPublicActionName(const std::string& action_name) {
+    // Internal control-plane helpers are invoked through dedicated RPC methods.
+    return action_name != "config_show" && action_name != "config_set_key";
+}
+
 }  // namespace
 
 ControlScriptRunner::ControlScriptRunner(
@@ -169,6 +174,9 @@ bool ControlScriptRunner::RunActionList(
 
     std::size_t index;
     for (index = 0; index < actions.size(); ++index) {
+        if (!IsPublicActionName(actions[index].name)) {
+            continue;
+        }
         nlohmann::json item;
         item["name"] = actions[index].name;
         item["label"] = actions[index].label;
