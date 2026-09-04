@@ -27,6 +27,17 @@ def _resolve_cmake() -> Path | None:
         if candidate.exists():
             return candidate
 
+    if sys.platform.startswith("win"):
+        native_windows_cmake = _find_existing(
+            [
+                Path(r"C:\msys64\mingw64\bin\cmake.exe"),
+                Path(r"C:\Espressif\tools\cmake\3.30.2\bin\cmake.exe"),
+                Path(r"C:\.espressif\tools\cmake\3.24.0\bin\cmake.exe"),
+            ]
+        )
+        if native_windows_cmake:
+            return native_windows_cmake
+
     from_path = shutil.which("cmake")
     if from_path:
         return Path(from_path)
@@ -47,6 +58,13 @@ def _resolve_mingw_tool(name: str, env_key: str) -> Path | None:
         candidate = Path(env_value)
         if candidate.exists():
             return candidate
+
+    if sys.platform.startswith("win"):
+        mingw_tool = _find_existing(
+            [Path(rf"C:\msys64\mingw64\bin\{name}.exe")]
+        )
+        if mingw_tool:
+            return mingw_tool
 
     from_path = shutil.which(name)
     if from_path:
@@ -151,18 +169,19 @@ def main() -> int:
 
     host_name = "gpi_host.exe" if sys.platform.startswith("win") else "gpi_host"
     client_name = "gpi_client.exe" if sys.platform.startswith("win") else "gpi_client"
-    example_server_name = (
-        "gpi_example_talk_server.exe" if sys.platform.startswith("win") else "gpi_example_talk_server"
-    )
-    example_client_name = (
-        "gpi_example_talk_client.exe" if sys.platform.startswith("win") else "gpi_example_talk_client"
-    )
+    executable_suffix = ".exe" if sys.platform.startswith("win") else ""
+    example_names = [
+        f"gpi_example1_host{executable_suffix}",
+        f"gpi_example1_client_a{executable_suffix}",
+        f"gpi_example1_client_b{executable_suffix}",
+    ]
 
     targets = [
         "gpi_host",
         "gpi_client",
-        "gpi_example_talk_server",
-        "gpi_example_talk_client",
+        "gpi_example1_host",
+        "gpi_example1_client_a",
+        "gpi_example1_client_b",
     ]
 
     rc = _run(
@@ -182,7 +201,7 @@ def main() -> int:
         return rc
 
     staged = {}
-    for binary_name in [host_name, client_name, example_server_name, example_client_name]:
+    for binary_name in [host_name, client_name, *example_names]:
         binary_path = _stage_binary(build_dir, bin_dir, binary_name)
         if binary_path is None:
             print(f"build failed: missing binary {binary_name}", file=sys.stderr)
@@ -195,7 +214,7 @@ def main() -> int:
         if source_dll.exists():
             shutil.copy2(source_dll, bin_dir / dll_name)
 
-    for binary_name in [host_name, client_name, example_server_name, example_client_name]:
+    for binary_name in [host_name, client_name, *example_names]:
         print(f"build ok: {staged[binary_name]}")
     print(f"build config: {build_config}")
     return 0
